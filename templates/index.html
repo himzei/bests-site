@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>보배드림 베스트글</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- 헤더 -->
+        <header class="header">
+            <h1>🚗 보배드림 베스트글</h1>
+            <p class="subtitle">실시간 인기 게시글을 확인하세요</p>
+        </header>
+
+        <!-- 새로고침 버튼 -->
+        <div class="controls">
+            <button id="refreshBtn" class="btn-refresh">
+                <span class="refresh-icon">🔄</span>
+                새로고침
+            </button>
+            <div id="lastUpdate" class="last-update">데이터를 불러오는 중...</div>
+        </div>
+
+        <!-- 로딩 인디케이터 -->
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <p>베스트글을 불러오는 중...</p>
+        </div>
+
+        <!-- 에러 메시지 -->
+        <div id="error" class="error-message" style="display: none;"></div>
+
+        <!-- 게시글 목록 -->
+        <div id="postsContainer" class="posts-container">
+            <!-- 게시글 카드들이 여기에 동적으로 추가됩니다 -->
+        </div>
+
+        <!-- 푸터 -->
+        <footer class="footer">
+            <p>보배드림 베스트글 모니터링 시스템</p>
+        </footer>
+    </div>
+
+    <script>
+        // 페이지 로드 시 데이터 가져오기
+        document.addEventListener('DOMContentLoaded', function() {
+            loadBestPosts();
+            
+            // 새로고침 버튼 이벤트
+            document.getElementById('refreshBtn').addEventListener('click', function() {
+                loadBestPosts();
+            });
+        });
+
+        // 베스트글 데이터 가져오기 함수
+        async function loadBestPosts() {
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error');
+            const postsContainer = document.getElementById('postsContainer');
+            const lastUpdateEl = document.getElementById('lastUpdate');
+            const refreshBtn = document.getElementById('refreshBtn');
+
+            // UI 상태 초기화
+            loadingEl.style.display = 'flex';
+            errorEl.style.display = 'none';
+            postsContainer.innerHTML = '';
+            refreshBtn.disabled = true;
+            refreshBtn.style.opacity = '0.6';
+
+            try {
+                // API 호출
+                const response = await fetch('/health');
+                const data = await response.json();
+
+                if (data.status === 'ok') {
+                    // 성공 시 게시글 표시
+                    displayPosts(data.게시글_목록);
+                    lastUpdateEl.textContent = `마지막 업데이트: ${data.데이터_수집_시간} (총 ${data.게시글_수}개)`;
+                    lastUpdateEl.style.color = '#4CAF50';
+                } else {
+                    // 에러 메시지 표시
+                    throw new Error(data.message || '데이터를 가져오는 중 오류가 발생했습니다');
+                }
+            } catch (error) {
+                // 에러 처리
+                errorEl.textContent = `오류: ${error.message}`;
+                errorEl.style.display = 'block';
+                lastUpdateEl.textContent = '데이터 로드 실패';
+                lastUpdateEl.style.color = '#f44336';
+            } finally {
+                // 로딩 완료
+                loadingEl.style.display = 'none';
+                refreshBtn.disabled = false;
+                refreshBtn.style.opacity = '1';
+            }
+        }
+
+        // 게시글 목록 표시 함수
+        function displayPosts(posts) {
+            const container = document.getElementById('postsContainer');
+            
+            if (!posts || posts.length === 0) {
+                container.innerHTML = '<div class="no-posts">표시할 게시글이 없습니다.</div>';
+                return;
+            }
+
+            // 게시글 카드 생성
+            const postsHTML = posts.map(post => `
+                <div class="post-card">
+                    <div class="post-rank">${post.순위}</div>
+                    <div class="post-content">
+                        <h3 class="post-title">
+                            <a href="${post.링크}" target="_blank" rel="noopener noreferrer">
+                                ${escapeHtml(post.제목)}
+                            </a>
+                        </h3>
+                        <div class="post-meta">
+                            <span class="meta-item">
+                                <span class="meta-icon">👤</span>
+                                ${escapeHtml(post.작성자)}
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-icon">🕐</span>
+                                ${escapeHtml(post.작성시간)}
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-icon">👁️</span>
+                                ${escapeHtml(post.조회수)}
+                            </span>
+                            <span class="meta-item">
+                                <span class="meta-icon">👍</span>
+                                ${escapeHtml(post.추천수)}
+                            </span>
+                            ${post.댓글수 !== '댓글수 없음' ? `
+                                <span class="meta-item">
+                                    <span class="meta-icon">💬</span>
+                                    ${escapeHtml(post.댓글수)}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="post-link-icon">🔗</div>
+                </div>
+            `).join('');
+
+            container.innerHTML = postsHTML;
+        }
+
+        // HTML 이스케이프 함수 (XSS 방지)
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
